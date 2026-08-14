@@ -26,7 +26,9 @@ CartilageIndentationAnalysis/
 ├── scripts/
 │   └── run_analysis.py           # entry point — runs the whole pipeline
 ├── data/
-│   └── sample_groups_template.xlsx   # example metadata sheet (columns only, no real data)
+│   ├── raw/                          # raw Bioindenter .TXT files (one per sample)
+│   ├── sample_groups.xlsx            # sample metadata + fit results
+│   └── sample_groups_template.xlsx   # example metadata sheet (format only)
 ├── figures/                      # place workflow diagrams / exported figures here
 ├── requirements.txt
 └── README.md
@@ -63,15 +65,16 @@ pip install -r requirements.txt
 | `test_type` | `mono` or `stress_relaxation` |
 | `Group` | grouping label (treatment + test type), used for plots and Native/UV pairing |
 
-See `data/sample_groups_template.xlsx`
+The dataset used here ships with the repository: raw files in `data/raw/`, metadata in
+`data/sample_groups.xlsx`. `data/sample_groups_template.xlsx` shows the required format.
 
 ---
 
 ## Usage
 
-1. Edit **`config.py`**: set `START_DIR`, `SAMPLE_SHEET`, `RAW_DATA_DIR`, and (if
-   needed) the analysis parameters. Output folders under `OUTPUT_ROOT` are created
-   automatically.
+1. (Optional) Edit **`config.py`** — by default it reads the bundled data in `data/`, so
+   no path changes are needed. Adjust the analysis parameters there if desired. To use data
+   stored elsewhere, change `SAMPLE_SHEET` / `RAW_DATA_DIR`. Output folders are created automatically.
 2. From the repository root, run:
 
 ```

@@ -1,8 +1,5 @@
-# ---- Experimental data & generated outputs (do NOT commit) ----
-# Raw indentation data
-*.TXT
-20260609_Indentor_Raw Data/
-# Generated figure/output folders
+# ---- Generated outputs (do NOT commit) ----
+# Figure / results folders created by the pipeline
 Analysis_Output*/
 Raw Data Plots/
 Raw vs Corrected Plots/
@@ -12,10 +9,10 @@ Corrected Data Plots/
 # FEBio run folders / logs
 contact_area_runs/
 *.log
-# Real metadata sheet with results (keep only data/sample_groups_template.xlsx)
-/sample_groups.xlsx
 # Excel lock / temp files
 ~$*.xlsx
+
+# NOTE: input data under data/ IS committed (raw .TXT + sample_groups.xlsx).
 
 # ---- Python / Jupyter ----
 __pycache__/
