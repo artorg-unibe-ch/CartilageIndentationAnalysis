@@ -1,0 +1,27 @@
+# ---- Experimental data & generated outputs (do NOT commit) ----
+# Raw indentation data
+*.TXT
+20260609_Indentor_Raw Data/
+# Generated figure/output folders
+Analysis_Output*/
+Raw Data Plots/
+Raw vs Corrected Plots/
+Comparison Native vs. UV Plots/
+Mono Hertz Fit Comparison/
+Corrected Data Plots/
+# FEBio run folders / logs
+contact_area_runs/
+*.log
+# Real metadata sheet with results (keep only data/sample_groups_template.xlsx)
+/sample_groups.xlsx
+# Excel lock / temp files
+~$*.xlsx
+
+# ---- Python / Jupyter ----
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
