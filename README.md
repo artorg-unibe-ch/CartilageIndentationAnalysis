@@ -23,9 +23,12 @@ CartilageIndentationAnalysis/
 │   ├── prony.py                  # 1-term Prony model + stress-relaxation fitting
 │   ├── plotting.py               # raw-vs-corrected, Native-vs-UV, and fit figures
 │   └── results.py                # write fit parameters back into the metadata sheet
+├── notebooks/
+│   └── analysis.ipynb            # interactive interface: imports the package, runs the analysis
 ├── scripts/
-│   └── run_analysis.py           # entry point — runs the whole pipeline
+│   └── run_analysis.py           # command-line entry point: runs the whole pipeline
 ├── data/
+│   ├── README.md.                    # detailed guide to organize the data
 │   ├── raw/                          # raw Bioindenter .TXT files (one per sample)
 │   ├── sample_groups.xlsx            # sample metadata + fit results
 │   └── sample_groups_template.xlsx   # example metadata sheet (format only)
@@ -68,6 +71,9 @@ pip install -r requirements.txt
 The dataset used here ships with the repository: raw files in `data/raw/`, metadata in
 `data/sample_groups.xlsx`. `data/sample_groups_template.xlsx` shows the required format.
 
+> **New to the format?** See **[`data/README.md`](data/README.md)** — it explains every column,
+> the Native-vs-UV pairing rule, and how to run the pipeline on your own data in 3 steps.
+
 ---
 
 ## Usage
@@ -85,6 +91,10 @@ This preprocesses every file, saves raw-vs-corrected and Native-vs-UV figures,
 fits the mono loading curves (Hertz, two contact-point methods) and the
 stress-relaxation curves (1-term Prony), and appends the fit parameters to the
 metadata sheet.
+
+Or, for an **interactive run**, open `notebooks/analysis.ipynb` — it imports the same
+package and runs each step in cells, showing the fitted parameters and figures inline.
+(The package holds the code; the notebook is just the narrative that drives it.)
 
 The package can also be imported directly, e.g.:
 

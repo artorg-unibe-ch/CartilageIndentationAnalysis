@@ -31,6 +31,13 @@ def main():
     print(f"Loaded {len(index.files)} files in {len(index.group_order)} groups "
           f"({len(index.subgroup_mono)} mono, {len(index.subgroup_sr)} stress-relaxation).")
 
+    # Warn about any 'Native' group with no matching 'UV' group (its comparison plot is skipped)
+    paired = {p["native_key"] for p in pairs}
+    unpaired = [g for g in index.group_order if "Native" in g and g not in paired]
+    if unpaired:
+        print("WARNING: no matching 'UV' group for:", unpaired)
+        print("  -> rename so the UV group is identical except 'Native' -> 'UV' (see data/README.md).")
+
     # 2. Preprocess: drift correction (mono) + contact-threshold zeroing
     mono_data, sr_data = preprocess_all(index, cfg)
 
@@ -47,10 +54,10 @@ def main():
                 mono_loading[path] = get_loading(df)
 
     res_moving = plotting.fit_and_plot_mono(index, pairs, mono_loading, "moving",
-                                            "Way2 Loading Moving", cfg.DIR_MONO_FIT,
+                                            "Loading moving regression", cfg.DIR_MONO_FIT,
                                             cfg.PROBE_RADIUS, cfg.POISSON_RATIO)
     res_p50 = plotting.fit_and_plot_mono(index, pairs, mono_loading, "p50",
-                                         "Way3 Loading p50", cfg.DIR_MONO_FIT,
+                                         "Loading data above 50 percent peak", cfg.DIR_MONO_FIT,
                                          cfg.PROBE_RADIUS, cfg.POISSON_RATIO)
 
     # 5. Stress-relaxation 1-term Prony fits

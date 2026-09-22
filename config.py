@@ -1,8 +1,16 @@
-"""User configuration — paths and analysis parameters.
+"""Configuration. You normally do NOT need to change the paths.
 
-By default the data is read from the ``data/`` folder inside this repository, so the
-project is self-contained: after cloning, ``python scripts/run_analysis.py`` just works.
-To use data stored elsewhere, edit ``SAMPLE_SHEET`` / ``RAW_DATA_DIR`` below.
+The pipeline reads the data bundled in this repo's data/ folder, so after `git clone`
+it runs as-is:
+
+    python scripts/run_analysis.py
+
+To analyse YOUR OWN data (no code changes needed):
+  1. put your raw .TXT files in   data/raw/
+  2. fill in                      data/sample_groups.xlsx   (copy the template; see data/README.md)
+  3. run                          python scripts/run_analysis.py
+
+Only edit SAMPLE_SHEET / RAW_DATA_DIR below if your data lives somewhere other than data/.
 """
 import os
 

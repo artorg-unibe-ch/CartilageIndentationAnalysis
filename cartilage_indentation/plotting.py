@@ -7,9 +7,7 @@ import os
 
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")          # save figures headless; remove to view interactively
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt   # backend auto-selected (Agg if headless; inline in notebooks)
 
 from .io_utils import load_raw_txt
 from .hertz import hertz, fit_one_curve
@@ -97,12 +95,31 @@ def plot_comparison_native_uv(index, pairs, mono_data, sr_data, out_dir):
 
 
 def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R_um, nu):
-    """Hertz-fit every mono pair's loading curve and plot Native vs UV.
+    """Hertz-fit EVERY mono loading curve (independent of Native/UV pairing), then draw the
+    Native-vs-UV comparison figures for paired groups.
 
-    Returns a DataFrame with one row per sample: ``group, treatment, sample_id, Es, cp, r2``.
+    Returns a DataFrame with one row per mono sample: ``group, treatment, sample_id, Es, cp, r2``.
     """
     os.makedirs(out_dir, exist_ok=True)
+
+    # 1) Fit every mono sample, so none is skipped just because it has no UV partner.
+    fits = {}   # path -> (E_s, cp, r2, E_star, d_lo, d_hi)
     rows = []
+    for g in index.subgroup_mono:
+        for path in index.subgrouped_files[g]:
+            if path not in mono_loading:
+                continue
+            d, f = mono_loading[path]
+            try:
+                fits[path] = fit_one_curve(d, f, strat, R_um, nu)
+            except Exception as e:
+                print(f"mono fit failed #{index.sample_id(path)} ({g}): {e}")
+                continue
+            E_s, cp, r2 = fits[path][0], fits[path][1], fits[path][2]
+            rows.append({"group": g, "treatment": index.treatment(path),
+                         "sample_id": index.sample_id(path), "Es": E_s, "cp": cp, "r2": r2})
+
+    # 2) Comparison figures per Native/UV pair (reuse the fits above).
     for paar in pairs:
         if paar["type"] != "mono":
             continue
@@ -113,22 +130,16 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
         reds  = [plt.cm.Reds(x)  for x in np.linspace(0.5, 0.95, max(1, len(uf)))]
         for files_, shades, tag in [(nf, blues, "Native"), (uf, reds, "UV")]:
             for i, path in enumerate(files_):
-                if path not in mono_loading:
+                if path not in fits:
                     continue
                 s_id = index.sample_id(path)
                 d, f = mono_loading[path]
-                try:
-                    E_s, cp, r2, E_star, d_lo, d_hi = fit_one_curve(d, f, strat, R_um, nu)
-                except Exception as e:
-                    print(f"fit failed {tag} #{s_id}: {e}")
-                    continue
-                depth = np.asarray(d, float) - cp                        # align to contact point
-                ax.plot(depth, f, color=shades[i], lw=1.2, alpha=0.3)    # raw loading data (full)
-                dd = np.linspace(d_lo, d_hi, 100)                        # draw fit only over fitted region
-                ax.plot(dd - cp, hertz(dd, E_star, cp, R_um), color=shades[i], lw=2.5,
+                E_s, cp, r2, E_star, d_lo, d_hi = fits[path]
+                # x-axis = the real indentation depth (displ_zeroed); the fit rises at its own cp
+                ax.plot(d, f, color=shades[i], lw=1.2, alpha=0.3)        # raw loading data (full)
+                dd = np.linspace(d_lo, d_hi, 100)                        # draw the fit only over the fitted region
+                ax.plot(dd, hertz(dd, E_star, cp, R_um), color=shades[i], lw=2.5,
                         label=f"{tag} #{s_id} (Es={E_s:.3f}, R²={r2:.2f})")
-                rows.append({"group": paar["name"], "treatment": tag, "sample_id": s_id,
-                             "Es": E_s, "cp": cp, "r2": r2})
         ax.set_title(f"{paar['name']} - {method_name}", fontsize=13, fontweight="bold")
         ax.set_xlabel("Indentation Depth [µm]"); ax.set_ylabel("Load [mN]")
         ax.grid(True, ls="--", alpha=0.5)
@@ -141,12 +152,32 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
 
 
 def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
-    """1-term Prony fit for every SR pair, plotted Native vs UV.
+    """1-term Prony fit for EVERY SR curve (independent of pairing), plus Native-vs-UV figures.
 
-    Returns a DataFrame with one row per sample: ``sample_id, g1, ge, tau1_s, F0_mN, r2_prony``.
+    Returns a DataFrame with one row per SR sample: ``sample_id, g1, ge, tau1_s, F0_mN, r2_prony``.
     """
     os.makedirs(out_dir, exist_ok=True)
+
+    # 1) Fit every stress-relaxation sample.
+    res_by_path = {}   # path -> result dict from fit_sr_1term
     prony_rows = []
+    for g in index.subgroup_sr:
+        for path in index.subgrouped_files[g]:
+            df = sr_data.get(path)
+            if df is None or df.empty:
+                continue
+            try:
+                res = fit_sr_1term(df, max_time)
+            except Exception as e:
+                print(f"SR fit error #{index.sample_id(path)} ({g}): {e}")
+                res = None
+            if res is None:
+                continue
+            res_by_path[path] = res
+            prony_rows.append({"sample_id": index.sample_id(path), "g1": res["g1"], "ge": res["ge"],
+                               "tau1_s": res["tau1_s"], "F0_mN": res["F0_mN"], "r2_prony": res["r2_prony"]})
+
+    # 2) Comparison figures per Native/UV pair.
     for paar in [p for p in pairs if p["type"] == "stress_relaxation"]:
         nf = index.subgrouped_files.get(paar["native_key"], [])
         uf = index.subgrouped_files.get(paar["uv_key"], [])
@@ -160,23 +191,15 @@ def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
                 df = sr_data.get(path)
                 if df is None or df.empty:
                     continue
-                s_id = index.sample_id(path)
-                color = shades[i]
+                s_id = index.sample_id(path); color = shades[i]
                 ax.plot(df["time_zeroed"].values, df["load_zeroed"].values,
                         color=color, lw=1.5, alpha=0.15, linestyle="--")   # raw, faint
-                try:
-                    res = fit_sr_1term(df, max_time)
-                except Exception as e:
-                    print(f"fit error {tag} #{s_id}: {e}")
-                    res = None
+                res = res_by_path.get(path)
                 if res is None:
                     continue
                 ax.plot(res["td"], res["fc"], color=color, lw=2.5, alpha=0.8,
                         label=f"{tag} #{s_id} Fit (τ={res['tau1_s']:.1f}s, "
                               f"g1={res['g1']:.2f}, R²={res['r2_prony']:.2f})")
-                prony_rows.append({"sample_id": s_id, "g1": res["g1"], "ge": res["ge"],
-                                   "tau1_s": res["tau1_s"], "F0_mN": res["F0_mN"],
-                                   "r2_prony": res["r2_prony"]})
                 has_data = True
         if has_data:
             ax.set_ylabel("load_zeroed [mN]"); ax.set_xlabel("Time [s]")

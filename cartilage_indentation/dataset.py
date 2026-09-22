@@ -15,6 +15,9 @@ class SampleIndex:
         df = pd.read_excel(sample_sheet_path)
         for c in ["file_name", "treatment", "test_type", "Group"]:
             df[c] = df[c].astype(str).str.strip()
+        # collapse any internal double spaces (a common typo) so grouping / pairing is robust
+        for c in ["treatment", "test_type", "Group"]:
+            df[c] = df[c].str.replace(r"\s+", " ", regex=True)
         df["sample_id"] = df["sample_id"].astype(int)
         self.sample_df = df
         self.raw_data_dir = raw_data_dir
