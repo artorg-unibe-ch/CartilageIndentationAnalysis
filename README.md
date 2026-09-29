@@ -127,7 +127,7 @@ All in **`config.py`**:
 - **Paths:** `START_DIR`, `SAMPLE_SHEET`, `RAW_DATA_DIR`; outputs under `OUTPUT_ROOT`.
 - **Probe / material:** `PROBE_RADIUS = 500` µm, `POISSON_RATIO = 0.25`.
 - **Stress-relaxation segments:** `TARGET_SEGS_SR = [5, 6, 7, 8]`.
-- **Contact detection:** `CONTACT_THRESHOLD = 6` (mN), `CONTACT_MIN_CONSEC = 3` rows.
+- **Contact detection:** `CONTACT_THRESHOLD = 6` (µN), `CONTACT_MIN_CONSEC = 3` rows.
 - **Prony window:** `SR_FIT_MAX_TIME = 120` s (peak → this time).
 
 **Output columns** added to the metadata sheet:

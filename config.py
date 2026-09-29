@@ -68,7 +68,7 @@ TARGET_SEGS_SR = [5, 6, 7, 8]     # instrument segments kept for stress-relaxati
 
 # Contact detection (first row where load stays above the threshold)
 CONTACT_COLUMN     = "load"
-CONTACT_THRESHOLD  = 6.0          # mN
+CONTACT_THRESHOLD  = 6.0          # uN
 CONTACT_MIN_CONSEC = 3            # consecutive rows above threshold
 
 # Stress-relaxation Prony fit window: from the load peak to this time [s]
