@@ -44,7 +44,7 @@ def plot_raw_vs_corrected(index, mono_data, sr_data, out_dir):
                     ax_corr.plot(corr["time_zeroed"], corr["load_zeroed"], color=color, label=f"Sample #{s_id}")
                 ax_raw.set_xlabel("time [s]"); ax_corr.set_xlabel("time_zeroed [s]")
         ax_raw.set_title("Raw"); ax_corr.set_title("Corrected")
-        ax_raw.set_ylabel("load [mN]"); ax_corr.set_ylabel("load_zeroed [mN]")
+        ax_raw.set_ylabel("load [uN]"); ax_corr.set_ylabel("load_zeroed [uN]")
         for ax in (ax_raw, ax_corr):
             ax.grid(True, linestyle="--", alpha=0.5)
         ax_corr.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=8)
@@ -81,7 +81,7 @@ def plot_comparison_native_uv(index, pairs, mono_data, sr_data, out_dir):
             plt.close(fig)
             print(f"skip  no matching data for {paar['name']}")
             continue
-        plt.ylabel("load_zeroed [mN]")
+        plt.ylabel("load_zeroed [uN]")
         plt.grid(True, linestyle="--", alpha=0.5)
         plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         plt.title(f"{paar['name']} Native vs. UV", fontsize=12, fontweight="bold")
@@ -141,7 +141,7 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
                 ax.plot(dd, hertz(dd, E_star, cp, R_um), color=shades[i], lw=2.5,
                         label=f"{tag} #{s_id} (Es={E_s:.3f}, R²={r2:.2f})")
         ax.set_title(f"{paar['name']} - {method_name}", fontsize=13, fontweight="bold")
-        ax.set_xlabel("Indentation Depth [µm]"); ax.set_ylabel("Load [mN]")
+        ax.set_xlabel("Indentation Depth [µm]"); ax.set_ylabel("Load [uN]")
         ax.grid(True, ls="--", alpha=0.5)
         ax.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8)
         fig.tight_layout()
@@ -154,7 +154,7 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
 def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
     """1-term Prony fit for EVERY SR curve (independent of pairing), plus Native-vs-UV figures.
 
-    Returns a DataFrame with one row per SR sample: ``sample_id, g1, ge, tau1_s, F0_mN, r2_prony``.
+    Returns a DataFrame with one row per SR sample: ``sample_id, g1, ge, tau1_s, F0_uN, r2_prony``.
     """
     os.makedirs(out_dir, exist_ok=True)
 
@@ -175,7 +175,7 @@ def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
                 continue
             res_by_path[path] = res
             prony_rows.append({"sample_id": index.sample_id(path), "g1": res["g1"], "ge": res["ge"],
-                               "tau1_s": res["tau1_s"], "F0_mN": res["F0_mN"], "r2_prony": res["r2_prony"]})
+                               "tau1_s": res["tau1_s"], "F0_uN": res["F0_uN"], "r2_prony": res["r2_prony"]})
 
     # 2) Comparison figures per Native/UV pair.
     for paar in [p for p in pairs if p["type"] == "stress_relaxation"]:
@@ -202,7 +202,7 @@ def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
                               f"g1={res['g1']:.2f}, R²={res['r2_prony']:.2f})")
                 has_data = True
         if has_data:
-            ax.set_ylabel("load_zeroed [mN]"); ax.set_xlabel("Time [s]")
+            ax.set_ylabel("load_zeroed [uN]"); ax.set_xlabel("Time [s]")
             ax.set_xlim(-0.5, 130); ax.grid(True, linestyle="--", alpha=0.5)
             ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=9)
             ax.set_title(f"{paar['name']} — Stress Relaxation (1-term Prony)",
@@ -211,7 +211,7 @@ def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
             fig.savefig(os.path.join(out_dir, paar["filename"].replace(".png", "_1term.png")),
                         dpi=300, bbox_inches="tight")
         plt.close(fig)
-    cols = ["sample_id", "g1", "ge", "tau1_s", "F0_mN", "r2_prony"]
+    cols = ["sample_id", "g1", "ge", "tau1_s", "F0_uN", "r2_prony"]
     if not prony_rows:
         return pd.DataFrame(columns=cols)
     return pd.DataFrame(prony_rows).sort_values("sample_id").reset_index(drop=True)
