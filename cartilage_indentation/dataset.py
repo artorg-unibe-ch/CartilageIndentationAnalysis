@@ -3,6 +3,8 @@ import os
 
 import pandas as pd
 
+TREATMENTS = ("Native", "Crosslinked", "Degraded", "Degraded_after_crosslinked")
+
 
 class SampleIndex:
     """Index of all raw files, built from the metadata sheet.
@@ -19,6 +21,12 @@ class SampleIndex:
         for c in ["treatment", "test_type", "Group"]:
             df[c] = df[c].str.replace(r"\s+", " ", regex=True)
         df["sample_id"] = df["sample_id"].astype(int)
+        unknown = sorted(set(df["treatment"]) - set(TREATMENTS))
+        if unknown:
+            raise ValueError(f"Unknown treatment(s): {unknown}. Expected: {TREATMENTS}")
+        for group, rows in df.groupby("Group"):
+            if rows["test_type"].nunique() != 1 or rows["treatment"].nunique() != 1:
+                raise ValueError(f"Group {group!r} must have one treatment and one test_type")
         self.sample_df = df
         self.raw_data_dir = raw_data_dir
 
@@ -43,8 +51,10 @@ class SampleIndex:
 
     # -- per-file metadata lookups --------------------------------------------
     def _info(self, path):
+        # file_name may include subdirectories relative to raw_data_dir.
+        relative_name = os.path.relpath(path, self.raw_data_dir)
         return self._by_name.get(
-            os.path.basename(path),
+            relative_name,
             {"sample_id": -1, "treatment": "unknown", "test_type": "unknown", "group": "unknown"},
         )
 
@@ -54,26 +64,29 @@ class SampleIndex:
     def test_type(self, path):  return self._info(path)["test_type"]
 
 
-def native_uv_pairs(index):
-    """Build Native-vs-UV comparison pairs from the group names.
+def treatment_comparisons(index):
+    """Three Native comparisons and a four-treatment overlay per test type.
 
-    Every ``Native`` group is paired with its ``UV`` counterpart (same base name and
-    test_type), so the pairing stays in sync if the sheet's groups change.
+    Pool groups with the same treatment/test_type. Group labels do not encode
+    matched specimens, and these overlays do not imply statistical pairing.
     """
-    pairs = []
-    for g in index.group_order:
-        if "Native" not in g:
+    comparisons = []
+    for test_type in ("mono", "stress_relaxation"):
+        files = {t: [p for p in index.files
+                     if index.test_type(p) == test_type and index.treatment(p) == t]
+                 for t in TREATMENTS}
+        if not any(files.values()):
             continue
-        uv_key = g.replace("Native", "UV")
-        if uv_key not in index.subgrouped_files:
-            continue
-        name = g.replace(" Native", "")
-        safe = "".join(c for c in name if c.isalnum() or c == " ").strip().replace(" ", "_")
-        pairs.append({
-            "name": name,
-            "type": index.group_ttype[g],
-            "native_key": g,
-            "uv_key": uv_key,
-            "filename": f"Comparison_{safe}_Native_vs_UV.png",
-        })
-    return pairs
+        selections = [("Native", t) for t in TREATMENTS[1:]] + [TREATMENTS]
+        for treatments in selections:
+            missing = [t for t in treatments if not files[t]]
+            label = " vs. ".join(treatments) if len(treatments) == 2 else "All four treatments"
+            if missing:
+                print(f"WARNING: skip {test_type} {label}: missing {', '.join(missing)}")
+                continue
+            suffix = "_vs_".join(treatments) if len(treatments) == 2 else "All_four_treatments"
+            comparisons.append({"name": f"{test_type}: {label}", "type": test_type,
+                                "treatments": treatments,
+                                "files": {t: files[t] for t in treatments},
+                                "filename": f"Comparison_{test_type}_{suffix}.png"})
+    return comparisons

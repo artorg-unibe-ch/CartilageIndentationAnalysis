@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config as cfg
-from cartilage_indentation.dataset import SampleIndex, native_uv_pairs
+from cartilage_indentation.dataset import SampleIndex, treatment_comparisons
 from cartilage_indentation.preprocessing import preprocess_all
 from cartilage_indentation.hertz import get_loading
 from cartilage_indentation import plotting
@@ -27,23 +27,18 @@ def main():
 
     # 1. Load metadata and group the raw files
     index = SampleIndex(cfg.SAMPLE_SHEET, cfg.RAW_DATA_DIR)
-    pairs = native_uv_pairs(index)
+    pairs = treatment_comparisons(index)
     print(f"Loaded {len(index.files)} files in {len(index.group_order)} groups "
           f"({len(index.subgroup_mono)} mono, {len(index.subgroup_sr)} stress-relaxation).")
 
-    # Warn about any 'Native' group with no matching 'UV' group (its comparison plot is skipped)
-    paired = {p["native_key"] for p in pairs}
-    unpaired = [g for g in index.group_order if "Native" in g and g not in paired]
-    if unpaired:
-        print("WARNING: no matching 'UV' group for:", unpaired)
-        print("  -> rename so the UV group is identical except 'Native' -> 'UV' (see data/README.md).")
+    print(f"Prepared {len(pairs)} treatment comparisons.")
 
     # 2. Preprocess: drift correction (mono) + contact-threshold zeroing
     mono_data, sr_data = preprocess_all(index, cfg)
 
     # 3. Overview plots
     plotting.plot_raw_vs_corrected(index, mono_data, sr_data, cfg.DIR_RAW_VS_CORR)
-    plotting.plot_comparison_native_uv(index, pairs, mono_data, sr_data, cfg.DIR_COMPARISON)
+    plotting.plot_treatment_comparisons(index, pairs, mono_data, sr_data, cfg.DIR_COMPARISON)
 
     # 4. Mono Hertz fits (loading curve; two contact-point methods)
     mono_loading = {}

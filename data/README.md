@@ -34,38 +34,39 @@ data/
 | ------------- | -------- | ------- | ------------------------------------- | ----- |
 | `file_name`   | yes      | text    | `sample_01.TXT`                       | must match a file inside `data/raw/` exactly |
 | `sample_id`   | yes      | integer | `1`, `2`, `3` ...                     | unique per sample; the key used for the results |
-| `treatment`   | yes      | text    | `Group A Native`, `Group A UV`        | free text describing the sample |
+| `treatment`   | yes      | text    | `Native`, `Crosslinked`, `Degraded`, `Degraded_after_crosslinked`        | use these four treatment names consistently |
 | `test_type`   | yes      | text    | **`mono`** or **`stress_relaxation`** | picks the analysis: Hertz (mono) or Prony (SR) |
 | `Group`       | yes      | text    | `Group A Native Mono`                 | grouping label — see the pairing rule below |
 
 Any extra columns you add (notes, dates, status, ...) are **kept** and carried through to the
 results — the pipeline only reads the five columns above.
 
----
+## Treatment comparisons and the `Group` column
 
-## The `Group` column and Native-vs-UV pairing (read this!)
+Use exactly these treatment names (case-sensitive): `Native`, `Crosslinked`,
+`Degraded`, `Degraded_after_crosslinked`. Unknown names raise an error.
 
-`Group` is a label **you invent**; the usual convention is `treatment` + `test_type`
-(e.g. `Group A Native Mono`). It controls two things:
+For each `test_type` (`mono` and `stress_relaxation`) separately, the pipeline produces:
 
-1. **Grouping** — samples with the same `Group` are plotted together.
-2. **Native-vs-UV comparison** — the pipeline automatically pairs a `Native` group with its
-   `UV` counterpart for the comparison figures.
+1. Native vs. Crosslinked.
+2. Native vs. Degraded.
+3. Native vs. Degraded_after_crosslinked.
+4. All four treatments on one figure.
 
-**Pairing rule:** the two group names must be **identical except that one contains `Native`
-and the other `UV`.** The code simply swaps the word `Native` -> `UV`:
+These comparisons apply to corrected curves, mono Hertz fits (both methods), and
+stress-relaxation Prony fits. Treatment colors stay consistent between figures.
+If a required treatment is absent, that comparison is skipped with a warning;
+individual samples are still fitted. These are curve overlays, not statistical tests
+or matched-specimen comparisons.
 
-```
-"Group A Native Mono"              <->  "Group A UV Mono"                OK  pairs
-"Group A Native Stress Relaxation" <->  "Group A UV Stress Relaxation"   OK  pairs
-"Group A Native Mono"              <->  "Group A UV - mono"              NO  won't pair (names differ)
-```
+`Group` remains the label for per-group raw-vs-corrected plots, for example
+`Native Mono` or `Crosslinked Stress Relaxation`. Each Group must contain only
+one treatment and one test type. Comparisons use the `treatment` and `test_type`
+columns, pooling all groups with the same combination; Group names need not match.
 
-If a `Native` group has no exactly-matching `UV` group it simply gets no comparison plot —
-and the run prints a warning telling you which group didn't match, so you can fix the name.
-
-The template `sample_groups_template.xlsx` shows one valid Native/UV pair for both `mono`
-and `stress_relaxation`; copy that pattern.
+The `sample_groups_template.xlsx` contains eight example rows: all four treatments
+for each test type. Replace the example file names and sample IDs with your own;
+add one row per raw file and keep the treatment names exactly as shown.
 
 ---
 

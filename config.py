@@ -56,7 +56,7 @@ _OUTPUT_BASE    = DATA_ROOT if _EXTERNAL else REPO_ROOT
 OUTPUT_ROOT     = os.environ.get("CIA_OUTPUT_ROOT", os.path.join(_OUTPUT_BASE, "Analysis_Output"))
 DIR_RAW_PLOTS   = os.path.join(OUTPUT_ROOT, "Raw Data Plots")
 DIR_RAW_VS_CORR = os.path.join(OUTPUT_ROOT, "Raw vs Corrected Plots")
-DIR_COMPARISON  = os.path.join(OUTPUT_ROOT, "Comparison Native vs. UV Plots")
+DIR_COMPARISON  = os.path.join(OUTPUT_ROOT, "Treatment Comparison Plots")
 DIR_MONO_FIT    = os.path.join(OUTPUT_ROOT, "Mono Hertz Fit Comparison")
 
 # ---------------------------------------------------------------------------

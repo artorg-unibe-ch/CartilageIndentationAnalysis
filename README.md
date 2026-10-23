@@ -4,8 +4,8 @@ A small **Python package** to process spherical **micro-indentation** measuremen
 of articular cartilage (Bioindenter `.TXT` files) and extract mechanical
 parameters. The pipeline performs baseline-drift correction, contact-point
 detection, **Hertz** elastic fitting of monotonic (mono) indentation, and
-**1-term Prony** viscoelastic fitting of stress-relaxation curves. Native and
-crosslinked (UV / riboflavin) groups are compared automatically, and every fit
+**1-term Prony** viscoelastic fitting of stress-relaxation curves. Native is compared individually with Crosslinked, Degraded, and
+Degraded_after_crosslinked, with an additional four-treatment overlay per test type, and every fit
 parameter is written back into the sample metadata sheet.
 
 ---
@@ -17,11 +17,11 @@ CartilageIndentationAnalysis/
 ├── config.py                     # user settings: paths + analysis parameters (edit this)
 ├── cartilage_indentation/        # the package
 │   ├── io_utils.py               # read raw Bioindenter .TXT files
-│   ├── dataset.py                # SampleIndex: read metadata sheet, group files, build Native/UV pairs
+│   ├── dataset.py                # SampleIndex: read metadata sheet, group files, build treatment comparisons
 │   ├── preprocessing.py          # contact detection, zeroing, mono baseline-drift correction
 │   ├── hertz.py                  # Hertz model + fitting (moving-regression / 50%-max contact point)
 │   ├── prony.py                  # 1-term Prony model + stress-relaxation fitting
-│   ├── plotting.py               # raw-vs-corrected, Native-vs-UV, and fit figures
+│   ├── plotting.py               # raw-vs-corrected, treatment comparison, and fit figures
 │   └── results.py                # write fit parameters back into the metadata sheet
 ├── notebooks/
 │   └── analysis.ipynb            # interactive interface: imports the package, runs the analysis
@@ -64,15 +64,15 @@ pip install -r requirements.txt
 | --- | --- |
 | `file_name` | raw `.TXT` file name |
 | `sample_id` | integer sample id |
-| `treatment` | e.g. `Clinical Riboflavin Part 1 Native`, `Sigma Riboflavin UV` |
+| `treatment` | e.g.`Native` `Crosslinked`, `Degraded` ,`Degraded_after_crosslinked` |
 | `test_type` | `mono` or `stress_relaxation` |
-| `Group` | grouping label (treatment + test type), used for plots and Native/UV pairing |
+| `Group` | label for per-group plots; comparisons pool samples by treatment and test_type |
 
 The dataset used here ships with the repository: raw files in `data/raw/`, metadata in
 `data/sample_groups.xlsx`. `data/sample_groups_template.xlsx` shows the required format.
 
 > **New to the format?** See **[`data/README.md`](data/README.md)** — it explains every column,
-> the Native-vs-UV pairing rule, and how to run the pipeline on your own data in 3 steps.
+> the treatment comparison rules, and how to run the pipeline on your own data in 3 steps.
 
 ---
 
@@ -87,7 +87,7 @@ The dataset used here ships with the repository: raw files in `data/raw/`, metad
 python scripts/run_analysis.py
 ```
 
-This preprocesses every file, saves raw-vs-corrected and Native-vs-UV figures,
+This preprocesses every file, saves raw-vs-corrected and treatment comparison figures,
 fits the mono loading curves (Hertz, two contact-point methods) and the
 stress-relaxation curves (1-term Prony), and appends the fit parameters to the
 metadata sheet.
@@ -111,7 +111,7 @@ mono_data, sr_data = preprocess_all(index, cfg)
 
 ## Workflow
 
-1. **Load & group** (`dataset.py`) — read the metadata sheet, map each `.TXT` to its group, build Native-vs-UV pairs.
+1. **Load & group** (`dataset.py`) — read the metadata sheet, map each `.TXT` to its group, build treatment comparison pairs.
 2. **Contact detection & zeroing** (`preprocessing.py`) — contact = first row where load stays above a threshold for a few consecutive rows; `time`/`displ` are zeroed at contact and `load` is referenced to the pre-contact baseline.
 3. **Drift correction (mono only)** — mono tests are slow, so a slow linear baseline drift is removed using the two "should-be-zero" baselines (pre-contact and post-retract): `F_true(t) = F(t) − tan(α)·(t − t0)`.
 4. **Hertz fit (mono)** (`hertz.py`) — `F = (4/3)·E*·√R·(d − cp)^1.5` on the loading ramp, with two ways to define the contact point `cp`: **moving regression** on the linearized curve `F^(2/3)` vs `d`, or **data above 50 % of peak load**.
