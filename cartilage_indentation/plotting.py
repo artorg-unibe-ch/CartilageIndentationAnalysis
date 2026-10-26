@@ -29,19 +29,19 @@ def plot_raw_vs_corrected(index, mono_data, sr_data, out_dir):
             continue
         fig, (ax_raw, ax_corr) = plt.subplots(1, 2, figsize=(16, 5))
         for i, path in enumerate(group_files):
-            s_id = index.sample_id(path)
+            s_id = index.sample_label(path)
             color = palette[i % len(palette)]
             raw = load_raw_txt(path)
             corr = mono_data.get(path) if test_type == "mono" else sr_data.get(path)
             if test_type == "mono":
-                ax_raw.plot(raw["displ"], raw["load"], color=color, label=f"Site #{s_id}")
+                ax_raw.plot(raw["displ"], raw["load"], color=color, label=f"Site {s_id}")
                 if corr is not None and not corr.empty:
-                    ax_corr.plot(corr["displ_zeroed"], corr["load_zeroed"], color=color, label=f"Site #{s_id}")
+                    ax_corr.plot(corr["displ_zeroed"], corr["load_zeroed"], color=color, label=f"Site {s_id}")
                 ax_raw.set_xlabel("displ [µm]"); ax_corr.set_xlabel("displ_zeroed [µm]")
             else:
-                ax_raw.plot(raw["time"], raw["load"], color=color, label=f"Site #{s_id}")
+                ax_raw.plot(raw["time"], raw["load"], color=color, label=f"Site {s_id}")
                 if corr is not None and not corr.empty:
-                    ax_corr.plot(corr["time_zeroed"], corr["load_zeroed"], color=color, label=f"Site #{s_id}")
+                    ax_corr.plot(corr["time_zeroed"], corr["load_zeroed"], color=color, label=f"Site {s_id}")
                 ax_raw.set_xlabel("time [s]"); ax_corr.set_xlabel("time_zeroed [s]")
         ax_raw.set_title("Raw"); ax_corr.set_title("Corrected")
         ax_raw.set_ylabel("load [uN]"); ax_corr.set_ylabel("load_zeroed [uN]")
@@ -69,7 +69,7 @@ def _comparison_series(comparison):
     for treatment in comparison["treatments"]:
         files = comparison["files"][treatment]
         levels = np.linspace(0.5, 0.95, len(files)) if len(files) > 1 else [0.7]
-        yield files, [_TREATMENT_CMAPS[treatment](x) for x in levels], treatment
+        yield files, [(_TREATMENT_CMAPS.get(treatment, plt.cm.Blues))(x) for x in levels], treatment
 
 
 def plot_treatment_comparisons(index, pairs, mono_data, sr_data, out_dir):
@@ -83,11 +83,11 @@ def plot_treatment_comparisons(index, pairs, mono_data, sr_data, out_dir):
                 df = mono_data.get(path) if paar["type"] == "mono" else sr_data.get(path)
                 if df is None or df.empty:
                     continue
-                s_id = index.sample_id(path)
+                s_id = index.sample_label(path)
                 if paar["type"] == "mono":
-                    plt.plot(df["displ_zeroed"], df["load_zeroed"], color=shades[i], label=f"{tag} #{s_id}")
+                    plt.plot(df["displ_zeroed"], df["load_zeroed"], color=shades[i], linestyle=index.line_style(path), label=f"{tag} {s_id}")
                 else:
-                    plt.plot(df["time_zeroed"], df["load_zeroed"], color=shades[i], label=f"{tag} #{s_id}")
+                    plt.plot(df["time_zeroed"], df["load_zeroed"], color=shades[i], linestyle=index.line_style(path), label=f"{tag} {s_id}")
                 has_data = True
         if not has_data:
             plt.close(fig)
@@ -140,14 +140,14 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
             for i, path in enumerate(files_):
                 if path not in fits:
                     continue
-                s_id = index.sample_id(path)
+                s_id = index.sample_label(path)
                 d, f = mono_loading[path]
                 E_s, cp, r2, E_star, d_lo, d_hi = fits[path]
                 # x-axis = the real indentation depth (displ_zeroed); the fit rises at its own cp
                 ax.plot(d, f, color=shades[i], lw=1.2, alpha=0.3)        # raw loading data (full)
                 dd = np.linspace(d_lo, d_hi, 100)                        # draw the fit only over the fitted region
-                ax.plot(dd, hertz(dd, E_star, cp, R_um), color=shades[i], lw=2.5,
-                        label=f"{tag} #{s_id} (Es={E_s:.3f}, R²={r2:.2f})")
+                ax.plot(dd, hertz(dd, E_star, cp, R_um), color=shades[i], lw=2.5, linestyle=index.line_style(path),
+                        label=f"{tag} {s_id} (Es={E_s:.3f}, R²={r2:.2f})")
         if not ax.lines:
             plt.close(fig)
             continue
@@ -197,14 +197,14 @@ def fit_and_plot_sr(index, pairs, sr_data, out_dir, max_time=120.0):
                 df = sr_data.get(path)
                 if df is None or df.empty:
                     continue
-                s_id = index.sample_id(path); color = shades[i]
+                s_id = index.sample_label(path); color = shades[i]
                 ax.plot(df["time_zeroed"].values, df["load_zeroed"].values,
                         color=color, lw=1.5, alpha=0.15, linestyle="--")   # raw, faint
                 res = res_by_path.get(path)
                 if res is None:
                     continue
-                ax.plot(res["td"], res["fc"], color=color, lw=2.5, alpha=0.8,
-                        label=f"{tag} #{s_id} Fit (τ={res['tau1_s']:.1f}s, "
+                ax.plot(res["td"], res["fc"], color=color, lw=2.5, alpha=0.8, linestyle=index.line_style(path),
+                        label=f"{tag} {s_id} Fit (τ={res['tau1_s']:.1f}s, "
                               f"g1={res['g1']:.2f}, R²={res['r2_prony']:.2f})")
                 has_data = True
         if has_data:

@@ -41,6 +41,43 @@ data/
 Any extra columns you add (notes, dates, status, ...) are **kept** and carried through to the
 results — the pipeline only reads the five columns above.
 
+## Comparing multiple experimental batches
+
+Keep the original raw files and source sheets in place. Create a separate joint
+`sample_groups.xlsx` with one row per measurement and paths relative to a common
+`CIA_RAW_DATA_DIR`. File names may include subdirectories, for example
+`20261022/Native/20261022# 1.TXT`.
+
+- Assign globally unique integer `sample_id` values. Duplicate IDs or file names
+  are rejected, because fit results are joined using `sample_id`.
+- Keep `original_sample_id`, `original_group`, and `source_sheet` for traceability.
+- Add an optional `batch` column (for example `20261022`). Plots show the batch in
+  legends and use a consistent line style for each batch (four styles cycle).
+- Prefix `Group` with the batch so each batch retains its own raw/corrected plot.
+- Keep treatment names unchanged. Treatment comparisons pool batches, while
+  additional Native comparisons show batches separately for each test type.
+
+The pipeline recalculates fits using the current `config.py` settings and writes
+them into the joint sheet. Source sheets are untouched. Curves are overlays;
+they do not establish statistical significance or matched biological samples.
+
+For the 20261022 and 20261026 datasets, the joint directory is
+`/Users/xkk/Desktop/ExprimentResultsRawDataIndentation /20261022_26/combined_analysis`.
+Run its launcher with the Python environment containing the project dependencies:
+
+```bash
+/opt/anaconda3/bin/python "/Users/xkk/Desktop/ExprimentResultsRawDataIndentation /20261022_26/combined_analysis/run_combined.py"
+```
+
+Results go into `combined_analysis/Analysis_Output/`; fitted parameters are
+written to `combined_analysis/sample_groups.xlsx`.
+
+For future batches, `scripts/combine_batches.py` validates source files and emits
+a JSON manifest for spreadsheet export. Supply `--root COMMON_RAW_ROOT`,
+`--output NEW_MANIFEST.json`, and one `--batch LABEL SHEET RAW_DIR` per batch.
+It assigns new IDs in source order and omits previous fit columns. Keep the
+batch list/order stable when regenerating to preserve the assigned IDs.
+
 ## Treatment comparisons and the `Group` column
 
 Use exactly these treatment names (case-sensitive): `Native`, `Crosslinked`,

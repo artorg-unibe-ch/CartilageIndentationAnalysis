@@ -23,12 +23,29 @@ def save_results(sample_sheet_path, mono_results, prony_df):
             continue
         cols = res[["sample_id", "Es", "cp", "r2"]].rename(columns={
             "Es": f"Es_{method_key}", "cp": f"cp_{method_key}", "r2": f"r2_{method_key}"})
-        results = results.merge(cols, on="sample_id", how="left")
+        results = results.merge(cols, on="sample_id", how="left", validate="one_to_one")
 
     if prony_df is not None and not prony_df.empty:
         results = results.merge(
             prony_df[["sample_id", "g1", "ge", "tau1_s", "F0_mN", "r2_prony"]],
-            on="sample_id", how="left")
+            on="sample_id", how="left", validate="one_to_one")
 
     results.to_excel(sample_sheet_path, index=False)
     return results
+
+
+def save_fit_issues(results, output_path):
+    """List missing fits and negative R² without excluding samples or imposing a cutoff."""
+    issues = []
+    for _, row in results.iterrows():
+        methods = [("moving", "r2_moving"), ("p50", "r2_p50")] if row["test_type"] == "mono" else [("prony", "r2_prony")]
+        for method, column in methods:
+            r2 = row.get(column, float("nan"))
+            if pd.isna(r2) or r2 < 0:
+                issue = {key: row.get(key, "") for key in
+                         ("sample_id", "batch", "original_sample_id", "file_name")}
+                issue.update(method=method, status="missing_fit" if pd.isna(r2) else "negative_R2", R2=r2)
+                issues.append(issue)
+    columns = ["sample_id", "batch", "original_sample_id", "file_name", "method", "status", "R2"]
+    pd.DataFrame(issues, columns=columns).to_csv(output_path, index=False)
+    return len(issues)

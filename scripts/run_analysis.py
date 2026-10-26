@@ -14,11 +14,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config as cfg
-from cartilage_indentation.dataset import SampleIndex, treatment_comparisons
+from cartilage_indentation.dataset import SampleIndex, treatment_comparisons, batch_comparisons
 from cartilage_indentation.preprocessing import preprocess_all
 from cartilage_indentation.hertz import get_loading
 from cartilage_indentation import plotting
-from cartilage_indentation.results import save_results
+from cartilage_indentation.results import save_results, save_fit_issues
 
 
 def main():
@@ -27,7 +27,7 @@ def main():
 
     # 1. Load metadata and group the raw files
     index = SampleIndex(cfg.SAMPLE_SHEET, cfg.RAW_DATA_DIR)
-    pairs = treatment_comparisons(index)
+    pairs = treatment_comparisons(index) + batch_comparisons(index)
     print(f"Loaded {len(index.files)} files in {len(index.group_order)} groups "
           f"({len(index.subgroup_mono)} mono, {len(index.subgroup_sr)} stress-relaxation).")
 
@@ -60,7 +60,9 @@ def main():
                                         cfg.SR_FIT_MAX_TIME)
 
     # 6. Write all fit parameters back into the metadata sheet
-    save_results(cfg.SAMPLE_SHEET, {"moving": res_moving, "p50": res_p50}, prony_df)
+    results = save_results(cfg.SAMPLE_SHEET, {"moving": res_moving, "p50": res_p50}, prony_df)
+    issue_count = save_fit_issues(results, os.path.join(cfg.OUTPUT_ROOT, "fit_issues.csv"))
+    print(f"Fit review: {issue_count} missing-fit or negative-R² entries -> fit_issues.csv")
 
     print(f"Done. Figures -> {cfg.OUTPUT_ROOT}")
     print(f"Fit parameters appended to {os.path.basename(cfg.SAMPLE_SHEET)}")

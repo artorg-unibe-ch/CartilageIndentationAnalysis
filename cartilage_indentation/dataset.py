@@ -21,6 +21,11 @@ class SampleIndex:
         for c in ["treatment", "test_type", "Group"]:
             df[c] = df[c].str.replace(r"\s+", " ", regex=True)
         df["sample_id"] = df["sample_id"].astype(int)
+        if df["sample_id"].duplicated().any():
+            raise ValueError("sample_id must be unique across all batches")
+        if df["file_name"].duplicated().any():
+            raise ValueError("file_name must be unique across all batches")
+        df["batch"] = df["batch"].fillna("").astype(str).str.strip() if "batch" in df else ""
         unknown = sorted(set(df["treatment"]) - set(TREATMENTS))
         if unknown:
             raise ValueError(f"Unknown treatment(s): {unknown}. Expected: {TREATMENTS}")
@@ -33,7 +38,7 @@ class SampleIndex:
         # Metadata keyed by file name ('group' holds the 'Group' column)
         self._by_name = {
             row.file_name: {"sample_id": row.sample_id, "treatment": row.treatment,
-                            "test_type": row.test_type, "group": row.Group}
+                            "test_type": row.test_type, "group": row.Group, "batch": row.batch}
             for row in df.itertuples(index=False)
         }
 
@@ -62,6 +67,15 @@ class SampleIndex:
     def group(self, path):      return self._info(path)["group"]
     def treatment(self, path):  return self._info(path)["treatment"]
     def test_type(self, path):  return self._info(path)["test_type"]
+    def batch(self, path):      return self._info(path).get("batch", "")
+
+    def line_style(self, path):
+        batches = list(dict.fromkeys(self.sample_df["batch"]))
+        return ("-", "--", "-.", ":")[batches.index(self.batch(path)) % 4]
+
+    def sample_label(self, path):
+        label = f"#{self.sample_id(path)}"
+        return f"{label} [{self.batch(path)}]" if self.batch(path) else label
 
 
 def treatment_comparisons(index):
@@ -93,4 +107,20 @@ def treatment_comparisons(index):
                                 "treatments": treatments,
                                 "files": {t: files[t] for t in treatments},
                                 "filename": f"Comparison_{test_type}_{suffix}.png"})
+    return comparisons
+
+
+def batch_comparisons(index):
+    """Compare Native across batches for each test type, without implying pairing."""
+    comparisons = []
+    for test_type in ("mono", "stress_relaxation"):
+        files = {}
+        for path in index.files:
+            if index.treatment(path) == "Native" and index.test_type(path) == test_type and index.batch(path):
+                files.setdefault(index.batch(path), []).append(path)
+        if len(files) > 1:
+            comparisons.append({"name": f"{test_type}: Native across batches",
+                                "type": test_type, "treatments": tuple(files),
+                                "files": files, "batch_comparison": True,
+                                "filename": f"Comparison_{test_type}_Native_batches.png"})
     return comparisons
