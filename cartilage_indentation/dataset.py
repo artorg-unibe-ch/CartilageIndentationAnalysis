@@ -65,7 +65,7 @@ class SampleIndex:
 
 
 def treatment_comparisons(index):
-    """Three Native comparisons and a four-treatment overlay per test type.
+    """Five pairwise comparisons and a four-treatment overlay per test type.
 
     Pool groups with the same treatment/test_type. Group labels do not encode
     matched specimens, and these overlays do not imply statistical pairing.
@@ -77,7 +77,11 @@ def treatment_comparisons(index):
                  for t in TREATMENTS}
         if not any(files.values()):
             continue
-        selections = [("Native", t) for t in TREATMENTS[1:]] + [TREATMENTS]
+        selections = [("Native", t) for t in TREATMENTS[1:]] + [
+            ("Degraded", "Degraded_after_crosslinked"),
+            ("Crosslinked", "Degraded_after_crosslinked"),
+            TREATMENTS,
+        ]
         for treatments in selections:
             missing = [t for t in treatments if not files[t]]
             label = " vs. ".join(treatments) if len(treatments) == 2 else "All four treatments"

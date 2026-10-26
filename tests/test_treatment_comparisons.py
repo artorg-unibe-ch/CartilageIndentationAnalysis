@@ -30,12 +30,14 @@ class TreatmentComparisonTests(unittest.TestCase):
     def test_complete_and_missing_treatments(self):
         index = make_index()
         comparisons = treatment_comparisons(index)
-        self.assertEqual(len(comparisons), 8)
-        self.assertEqual(len({p["filename"] for p in comparisons}), 8)
+        self.assertEqual(len(comparisons), 12)
+        self.assertEqual(len({p["filename"] for p in comparisons}), 12)
         for test_type in ("mono", "stress_relaxation"):
             selected = [p for p in comparisons if p["type"] == test_type]
             self.assertEqual([p["treatments"] for p in selected],
-                             [("Native", t) for t in TREATMENTS[1:]] + [TREATMENTS])
+                             [("Native", t) for t in TREATMENTS[1:]] + [
+                                 ("Degraded", "Degraded_after_crosslinked"),
+                                 ("Crosslinked", "Degraded_after_crosslinked"), TREATMENTS])
             for comparison in selected:
                 for treatment, paths in comparison["files"].items():
                     self.assertTrue(paths)
@@ -44,10 +46,16 @@ class TreatmentComparisonTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             partial = treatment_comparisons(make_index(omit=("Degraded",)))
-        self.assertEqual(len(partial), 4)
+        self.assertEqual(len(partial), 6)
         self.assertIn("missing Degraded", output.getvalue())
         with contextlib.redirect_stdout(io.StringIO()):
-            self.assertEqual(treatment_comparisons(make_index(omit=("Native",))), [])
+            without_native = treatment_comparisons(make_index(omit=("Native",)))
+        self.assertEqual(len(without_native), 4)
+        self.assertTrue(all("Native" not in p["treatments"] for p in without_native))
+        with contextlib.redirect_stdout(io.StringIO()):
+            without_after_cl = treatment_comparisons(make_index(omit=("Degraded_after_crosslinked",)))
+        self.assertEqual(len(without_after_cl), 4)
+        self.assertTrue(all("Degraded_after_crosslinked" not in p["treatments"] for p in without_after_cl))
 
     def test_all_plot_paths_and_fit_results(self):
         index = make_index()
@@ -83,8 +91,8 @@ class TreatmentComparisonTests(unittest.TestCase):
             self.assertEqual(len(result), 4)
             self.assertIn("F0_mN", result.columns)
             self.assertTrue(np.isfinite(result["tau1_s"]).all())
-        self.assertEqual(len(saved), 20)
-        self.assertEqual(len(set(saved)), 20)
+        self.assertEqual(len(saved), 30)
+        self.assertEqual(len(set(saved)), 30)
 
 
 if __name__ == "__main__":

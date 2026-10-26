@@ -51,7 +51,9 @@ For each `test_type` (`mono` and `stress_relaxation`) separately, the pipeline p
 1. Native vs. Crosslinked.
 2. Native vs. Degraded.
 3. Native vs. Degraded_after_crosslinked.
-4. All four treatments on one figure.
+4. Degraded vs. Degraded_after_crosslinked.
+5. Crosslinked vs. Degraded_after_crosslinked.
+6. All four treatments on one figure.
 
 These comparisons apply to corrected curves, mono Hertz fits (both methods), and
 stress-relaxation Prony fits. Treatment colors stay consistent between figures.

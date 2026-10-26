@@ -5,6 +5,7 @@ of articular cartilage (Bioindenter `.TXT` files) and extract mechanical
 parameters. The pipeline performs baseline-drift correction, contact-point
 detection, **Hertz** elastic fitting of monotonic (mono) indentation, and
 **1-term Prony** viscoelastic fitting of stress-relaxation curves. Native is compared individually with Crosslinked, Degraded, and
+Degraded_after_crosslinked. Degraded and Crosslinked are also each compared with
 Degraded_after_crosslinked, with an additional four-treatment overlay per test type, and every fit
 parameter is written back into the sample metadata sheet.
 
