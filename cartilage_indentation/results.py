@@ -7,16 +7,28 @@ FIT_COLS = ["Es_moving", "cp_moving", "r2_moving", "Es_p50", "cp_p50", "r2_p50",
             "g1", "ge", "tau1_s", "F0_mN", "r2_prony"]
 
 
-def save_results(sample_sheet_path, mono_results, prony_df):
+def save_results(sample_sheet_path, mono_results, prony_df, *, output_path=None,
+                 included_sample_ids=None):
     """Append fit parameters to the metadata sheet (one row per sample).
 
     ``mono_results`` maps a method key to its results DataFrame, e.g.
     ``{"moving": df, "p50": df}`` (each with columns ``sample_id, Es, cp, r2``).
     ``prony_df`` has columns ``sample_id, g1, ge, tau1_s, F0_mN, r2_prony``.
+    Set ``output_path`` and ``included_sample_ids`` to save a filtered analysis
+    separately. Filtering requires a different output path to protect the source.
     """
     results = pd.read_excel(sample_sheet_path)
     results = results.drop(columns=[c for c in FIT_COLS if c in results.columns])
     results["sample_id"] = results["sample_id"].astype(int)
+    if included_sample_ids is not None:
+        from pathlib import Path
+        if output_path is None or Path(output_path).resolve() == Path(sample_sheet_path).resolve():
+            raise ValueError("Filtered results require a separate output_path")
+        included_sample_ids = set(included_sample_ids)
+        unknown = included_sample_ids - set(results["sample_id"])
+        if unknown:
+            raise ValueError(f"Unknown included sample IDs: {sorted(unknown)}")
+        results = results.loc[results["sample_id"].isin(included_sample_ids)].copy()
 
     for method_key, res in mono_results.items():
         if res is None or res.empty:
@@ -30,7 +42,7 @@ def save_results(sample_sheet_path, mono_results, prony_df):
             prony_df[["sample_id", "g1", "ge", "tau1_s", "F0_mN", "r2_prony"]],
             on="sample_id", how="left", validate="one_to_one")
 
-    results.to_excel(sample_sheet_path, index=False)
+    results.to_excel(output_path if output_path is not None else sample_sheet_path, index=False)
     return results
 
 

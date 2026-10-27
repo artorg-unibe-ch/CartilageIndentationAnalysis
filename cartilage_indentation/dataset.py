@@ -15,6 +15,10 @@ class SampleIndex:
 
     def __init__(self, sample_sheet_path, raw_data_dir):
         df = pd.read_excel(sample_sheet_path)
+        self._initialize(df, raw_data_dir)
+
+    def _initialize(self, df, raw_data_dir):
+        df = df.copy()
         for c in ["file_name", "treatment", "test_type", "Group"]:
             df[c] = df[c].astype(str).str.strip()
         # collapse any internal double spaces (a common typo) so grouping / pairing is robust
@@ -34,6 +38,7 @@ class SampleIndex:
                 raise ValueError(f"Group {group!r} must have one treatment and one test_type")
         self.sample_df = df
         self.raw_data_dir = raw_data_dir
+        self.excluded_df = df.iloc[:0].copy()
 
         # Metadata keyed by file name ('group' holds the 'Group' column)
         self._by_name = {
@@ -53,6 +58,28 @@ class SampleIndex:
         self.subgrouped_files = {
             g: [f for f in self.files if self.group(f) == g] for g in self.group_order
         }
+
+    def excluding(self, sample_ids=(), file_names=()):
+        """Return a fresh index; exclusions never change the original sheet/index.
+
+        File names must match the sheet's relative paths. Unknown selections and
+        an empty remaining dataset raise errors to catch typos before analysis.
+        Always call on the full index when editing a notebook's exclusion list.
+        """
+        sample_ids, file_names = set(sample_ids), set(file_names)
+        unknown_ids = sample_ids - set(self.sample_df["sample_id"])
+        unknown_files = file_names - set(self.sample_df["file_name"])
+        if unknown_ids or unknown_files:
+            raise ValueError(f"Unknown exclusions: sample_ids={sorted(unknown_ids)}, "
+                             f"file_names={sorted(unknown_files)}")
+        mask = (self.sample_df["sample_id"].isin(sample_ids) |
+                self.sample_df["file_name"].isin(file_names))
+        if mask.all():
+            raise ValueError("Exclusions would remove all samples. Keep at least one curve.")
+        selected = SampleIndex.__new__(SampleIndex)
+        selected._initialize(self.sample_df.loc[~mask], self.raw_data_dir)
+        selected.excluded_df = self.sample_df.loc[mask].copy()
+        return selected
 
     # -- per-file metadata lookups --------------------------------------------
     def _info(self, path):

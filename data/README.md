@@ -78,6 +78,33 @@ a JSON manifest for spreadsheet export. Supply `--root COMMON_RAW_ROOT`,
 It assigns new IDs in source order and omits previous fit columns. Keep the
 batch list/order stable when regenerating to preserve the assigned IDs.
 
+## Excluding curves in the notebook
+
+In `notebooks/analysis.ipynb`, run the setup and load cells, then edit Step **1a**:
+
+```python
+EXCLUDE_SAMPLE_IDS = [17, 25]  # current sheet's sample_id, not original_sample_id
+EXCLUDE_FILE_NAMES = []       # alternatively, exact file_name paths from the sheet
+EXCLUSION_NOTE = "Reason for excluding these curves"
+```
+
+Both lists default to empty. A curve matching either list is excluded from
+preprocessing, comparison plots, and fits. Rerun Step 1a and all analysis cells
+below it after changing the selection. Clear the lists to restore every curve.
+
+Filtered runs save figures and `analysis_results.xlsx` under
+`Analysis_Output/excluded_<selection>/`. The results sheet contains only included
+samples; `excluded_samples.csv` and `included_samples.csv` record the selection.
+The input workbook and raw files are preserved. Unknown IDs/paths and excluding
+every curve raise errors. The save cell also checks that both fitting steps were
+rerun for the current selection.
+
+Optional optimization exporters honor exclusions by resolved raw-file path when
+Step 1a has run in the same kernel. Their dataset roots must point to those same
+files. Matching exclusions use a separate export subfolder to avoid mixing older
+unfiltered CSVs into the filtered run. Notebook exclusions do not affect the
+separate `scripts/run_analysis.py` command.
+
 ## Treatment comparisons and the `Group` column
 
 Use exactly these treatment names (case-sensitive): `Native`, `Crosslinked`,
