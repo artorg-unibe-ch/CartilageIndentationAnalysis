@@ -71,5 +71,9 @@ CONTACT_COLUMN     = "load"
 CONTACT_THRESHOLD  = 6.0          # uN
 CONTACT_MIN_CONSEC = 3            # consecutive rows above threshold
 
+# p50 cp limits relative to the preprocessed contact zero, not the high-load window.
+# Configurable working limits (µm), not a measured contact uncertainty.
+P50_CP_BOUNDS_UM = (-20.0, 20.0)
+
 # Stress-relaxation Prony fit window: from the load peak to this time [s]
 SR_FIT_MAX_TIME = 120.0

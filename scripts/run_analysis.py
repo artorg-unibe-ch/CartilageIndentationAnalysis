@@ -35,6 +35,7 @@ def main():
 
     # 2. Preprocess: drift correction (mono) + contact-threshold zeroing
     mono_data, sr_data = preprocess_all(index, cfg)
+    index.preprocessing_report.to_csv(os.path.join(cfg.OUTPUT_ROOT, "preprocessing_report.csv"), index=False)
 
     # 3. Overview plots
     plotting.plot_raw_vs_corrected(index, mono_data, sr_data, cfg.DIR_RAW_VS_CORR)
@@ -53,14 +54,16 @@ def main():
                                             cfg.PROBE_RADIUS, cfg.POISSON_RATIO)
     res_p50 = plotting.fit_and_plot_mono(index, pairs, mono_loading, "p50",
                                          "Loading data above 50 percent peak", cfg.DIR_MONO_FIT,
-                                         cfg.PROBE_RADIUS, cfg.POISSON_RATIO)
+                                         cfg.PROBE_RADIUS, cfg.POISSON_RATIO,
+                                         p50_cp_bounds=cfg.P50_CP_BOUNDS_UM)
 
     # 5. Stress-relaxation 1-term Prony fits
     prony_df = plotting.fit_and_plot_sr(index, pairs, sr_data, cfg.DIR_COMPARISON,
                                         cfg.SR_FIT_MAX_TIME)
 
     # 6. Write all fit parameters back into the metadata sheet
-    results = save_results(cfg.SAMPLE_SHEET, {"moving": res_moving, "p50": res_p50}, prony_df)
+    results = save_results(cfg.SAMPLE_SHEET, {"moving": res_moving, "p50": res_p50}, prony_df,
+                           preprocessing_report=index.preprocessing_report)
     issue_count = save_fit_issues(results, os.path.join(cfg.OUTPUT_ROOT, "fit_issues.csv"))
     print(f"Fit review: {issue_count} missing-fit or negative-R² entries -> fit_issues.csv")
 

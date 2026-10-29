@@ -39,7 +39,7 @@ class ExclusionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 original.excluding(**kwargs)
         cfg = SimpleNamespace(CONTACT_THRESHOLD=6, CONTACT_MIN_CONSEC=3, TARGET_SEGS_SR=[5, 6])
-        with patch('cartilage_indentation.preprocessing.preprocess_mono', return_value=pd.DataFrame()) as mono, patch(
+        with patch('cartilage_indentation.preprocessing.preprocess_mono', return_value=pd.DataFrame({'load': [1.0]})) as mono, patch(
                 'cartilage_indentation.preprocessing.preprocess_sr') as sr:
             mono_data, sr_data = preprocess_all(selected, cfg)
         mono.assert_called_once_with('/raw/new/a.TXT', 6, 3)
@@ -89,6 +89,7 @@ class ExclusionTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'Rerun both fitting steps'):
                     exec(save_cell, ns)
                 ns.update(mono_fit_selection=ns['selection_signature'], sr_fit_selection=ns['selection_signature'],
+                          preprocess_selection=ns['selection_signature'],
                           res_moving=pd.DataFrame(), res_p50=pd.DataFrame(), prony_df=pd.DataFrame())
                 with patch('pandas.read_excel', return_value=ns['full_index'].sample_df), patch.object(pd.DataFrame, 'to_excel'):
                     ns['save_results'] = save_results

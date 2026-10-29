@@ -4,13 +4,14 @@ The fitting functions also return the per-sample fit parameters as DataFrames.
 A non-interactive matplotlib backend is used so figures are saved without a display.
 """
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt   # backend auto-selected (Agg if headless; inline in notebooks)
 
 from .io_utils import load_raw_txt
-from .hertz import hertz, fit_one_curve
+from .hertz import hertz, fit_one_curve, p50_cp_diagnostics, DEFAULT_P50_CP_BOUNDS_UM
 from .prony import fit_sr_1term
 
 
@@ -29,10 +30,12 @@ def plot_raw_vs_corrected(index, mono_data, sr_data, out_dir):
             continue
         fig, (ax_raw, ax_corr) = plt.subplots(1, 2, figsize=(16, 5))
         for i, path in enumerate(group_files):
+            corr = mono_data.get(path) if test_type == "mono" else sr_data.get(path)
+            if corr is None or corr.empty:
+                continue
             s_id = index.sample_label(path)
             color = palette[i % len(palette)]
             raw = load_raw_txt(path)
-            corr = mono_data.get(path) if test_type == "mono" else sr_data.get(path)
             if test_type == "mono":
                 ax_raw.plot(raw["displ"], raw["load"], color=color, label=f"Site {s_id}")
                 if corr is not None and not corr.empty:
@@ -43,6 +46,9 @@ def plot_raw_vs_corrected(index, mono_data, sr_data, out_dir):
                 if corr is not None and not corr.empty:
                     ax_corr.plot(corr["time_zeroed"], corr["load_zeroed"], color=color, label=f"Site {s_id}")
                 ax_raw.set_xlabel("time [s]"); ax_corr.set_xlabel("time_zeroed [s]")
+        if not ax_raw.lines:
+            plt.close(fig)
+            continue
         ax_raw.set_title("Raw"); ax_corr.set_title("Corrected")
         ax_raw.set_ylabel("load [uN]"); ax_corr.set_ylabel("load_zeroed [uN]")
         for ax in (ax_raw, ax_corr):
@@ -106,7 +112,8 @@ def plot_treatment_comparisons(index, pairs, mono_data, sr_data, out_dir):
         plt.close(fig)
 
 
-def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R_um, nu):
+def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R_um, nu,
+                      *, p50_cp_bounds=DEFAULT_P50_CP_BOUNDS_UM):
     """Hertz-fit EVERY mono loading curve (independent of comparison availability), then draw the
     treatment comparison figures for paired groups.
 
@@ -117,19 +124,30 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
     # 1) Fit every mono sample, so none is skipped just because it has no comparison partner.
     fits = {}   # path -> (E_s, cp, r2, E_star, d_lo, d_hi)
     rows = []
+    diagnostics = {}
     for g in index.subgroup_mono:
         for path in index.subgrouped_files[g]:
             if path not in mono_loading:
                 continue
             d, f = mono_loading[path]
             try:
-                fits[path] = fit_one_curve(d, f, strat, R_um, nu)
+                fits[path] = fit_one_curve(d, f, strat, R_um, nu, p50_cp_bounds=p50_cp_bounds)
             except Exception as e:
                 print(f"mono fit failed #{index.sample_id(path)} ({g}): {e}")
                 continue
             E_s, cp, r2 = fits[path][0], fits[path][1], fits[path][2]
+            if strat == "p50":
+                diagnostics[path] = p50_cp_diagnostics(d, f, cp, p50_cp_bounds)
+                if diagnostics[path]["cp_at_bound"]:
+                    warnings.warn(f"p50 sample {index.sample_label(path)}: cp={cp:.4g} µm "
+                                  "is at a contact bound; review the fit and contact limits.",
+                                  RuntimeWarning, stacklevel=2)
             rows.append({"group": g, "treatment": index.treatment(path),
-                         "sample_id": index.sample_id(path), "Es": E_s, "cp": cp, "r2": r2})
+                         "sample_id": index.sample_id(path), "Es": E_s, "cp": cp, "r2": r2,
+                         **diagnostics.get(path, {}),
+                         **{key: value for key, value in index.preprocessing_info(path).items()
+                            if key in ("mono_complete", "mono_incomplete_reason",
+                                       "drift_correction_applied", "preprocessing_method")}})
 
     # 2) Comparison figures per treatment comparison (reuse the fits above).
     for paar in pairs:
@@ -141,6 +159,8 @@ def fit_and_plot_mono(index, pairs, mono_loading, strat, method_name, out_dir, R
                 if path not in fits:
                     continue
                 s_id = index.sample_label(path)
+                if diagnostics.get(path, {}).get("cp_at_bound"):
+                    s_id += " [cp bound]"
                 d, f = mono_loading[path]
                 E_s, cp, r2, E_star, d_lo, d_hi = fits[path]
                 # x-axis = the real indentation depth (displ_zeroed); the fit rises at its own cp

@@ -1,7 +1,137 @@
 # `data/` — inputs for the pipeline
 
-This folder holds everything the analysis reads. **You do not need to edit any code or set
-any absolute paths** — just put your files here in the right shape and run.
+## Notebook input from filenames
+
+The notebook also supports raw files whose names contain the metadata:
+
+```text
+Measurement_3_Sample_A_native_mono_1.TXT
+Measurement_3_Sample_B_degraded_after_crosslinking_stress_relaxation_41.TXT
+```
+
+The default workflow is `INPUT_MODE = "filenames"` for **both single-folder and
+multi-folder analysis**. Excel is an optional reference/backup input mode.
+Configure one or more folders in `FILENAME_SOURCES` in the first notebook block:
+
+```python
+from pathlib import Path
+
+FILENAME_SOURCES = [
+    {"path": Path("/Users/xkk/Desktop/ExprimentResultsRawDataIndentation /20261029_3"),
+     "batch": "20261029", "label": "M3", "recursive": False},
+    {"path": Path("/Users/xkk/Desktop/ExprimentResultsRawDataIndentation /20261022_26/20261022"),
+     "batch": "20261022", "label": "M1", "recursive": True},
+    {"path": Path("/Users/xkk/Desktop/ExprimentResultsRawDataIndentation /20261022_26/20261026/20261026/raw"),
+     "batch": "20261026", "label": "M2", "recursive": False},
+]
+```
+
+Keep just one entry for a single folder, or add further entries for future data.
+`batch` records the date (not encoded in the filenames). `label` identifies the
+source and must be unique, using letters/numbers/underscores/hyphens. Set
+`recursive=True` to scan subfolders. `.mit` files are ignored; every selected
+`.TXT` must match the pattern. No raw-data copying or input Excel is required.
+
+The existing datasets use `Measurement_1_Sample_A` for 20261022 and
+`Measurement_2_Sample_A` for 20261026. The M2 input above deliberately selects the
+canonical files used by its original metadata, rather than recursively including
+the other export copies in the enclosing folders. Select each experiment once.
+
+The parser keeps `sample_name` (for example `Measurement_3_Sample_A`),
+`measurement`, `specimen`, original `status`, and `curve_number`, and derives
+`treatment`, `test_type`, and `Group`. `degraded_after_crosslinking` maps to the
+existing treatment `Degraded_after_crosslinked`. Single-source groups distinguish
+specimen, treatment and test type. With multiple sources, the source label is
+also included in `Group` to keep identically named specimens separate in per-group
+plots. Treatment comparisons still pool matching treatments/test types across
+sources; these overlays are not statistical tests or biological pairing.
+
+Each row retains `source_label`, `source_root`, `source_file_name` (relative to
+its own folder), and `source_path` (absolute). The loader selects a common raw-data
+root automatically and expresses `file_name` relative to it, so existing loading,
+exclusion, preprocessing and fitting cells work with all selected folders.
+Identical basenames in different folders are supported. Selecting the same physical
+file twice through overlapping roots or symlinks raises an error. Separate copies
+of the same data are not automatically deduplicated by content.
+
+Plot legends use specimen codes, for example `Native #5 (M3SA)` where `M3SA`
+means `Measurement_3_Sample_A`; `M3SB` means sample B from measurement 3.
+Incomplete-curve and contact-bound flags remain visible. Batch dates are kept
+in the metadata. Excel inputs can supply `sample_name` or use the same filename
+pattern; older inputs without specimen information retain their batch labels.
+
+`sample_id` is a unique sequential analysis ID, separate from the original curve
+number, which may repeat. IDs are assigned in deterministic order, but can shift
+if sources are reordered or files are added/removed. For exclusions, copy exact
+`file_name` values from the metadata preview. Adding/removing sources can also
+change the common root and these relative paths; review exclusions after changes.
+
+No input Excel is created or read. Results are saved as `analysis_results.xlsx`
+under `project/Analysis_Output/<folder>` for a single source, or
+`project/Analysis_Output/combined_filenames_<id>` for multiple sources; override
+this with `ANALYSIS_OUTPUT_ROOT`. Different source configurations get separate
+default output directories. Exclusions use their own subfolder as described below.
+Both optional optimization exporters also accept the parsed metadata, preserve
+specimen identity in CSV names and honor exclusions. Multi-source exports prefix
+each CSV name with its source label to avoid collisions. Their manifests preserve
+source paths and labels. Filename-mode exports go
+under the analysis output in `optimization_90deg/` or `optimization_45deg/`.
+
+Set `INPUT_MODE = "excel"` to use the original workbook input. Its path examples
+and instructions remain in the notebook as a reference. The command-line
+`scripts/run_analysis.py` continues to use Excel input.
+
+### Curves that fail preprocessing
+
+Notebook Step 2 defaults to `PREPROCESS_ON_ERROR = "skip"`: it processes each
+curve independently and saves `preprocessing_report.csv` with a success/failure
+status and error message for every attempt. A failure no longer stops the other
+curves. Failed curves are absent from analysis plots and fits, but remain in
+the results table with `preprocessing_status = "failed"`, the reason, and blank
+fit parameters. Manually excluded curves are omitted from filtered results.
+
+The contact threshold and correction rules are unchanged. Set
+`PREPROCESS_ON_ERROR = "raise"` to stop on the first failure. If no curve succeeds,
+the notebook stops after saving the report. Rerun preprocessing and both fitting
+steps before saving after a change. The command-line pipeline keeps strict
+preprocessing behavior by default.
+
+### Loading-only or otherwise incomplete mono curves
+
+The two-baseline drift correction is used only when the file contains loading,
+at least 3 subsequent unloading points (`segm 3`), and at least 15 trailing
+retract points (`segm 4`) for the post-test baseline. Otherwise, mono preprocessing
+uses contact zeroing alone. The measured terminal loading force is never used as
+a post-unloading zero-force baseline for these incomplete curves.
+
+Incomplete curves remain in the analysis and both Hertz fits use their loading
+data (`segm 1`). Plots mark them `[incomplete; no drift correction]`. The report
+and result table include `mono_complete`, `mono_incomplete_reason`,
+`drift_correction_applied`, and `preprocessing_method`. Incompleteness itself is
+not a failure or an exclusion; missing contact or unsuitable fitting data may
+still cause failure. Review fit quality as usual. SR preprocessing is unchanged.
+
+### p50 contact-point limits
+
+The p50 Hertz method uses loads >= 50% of the loading peak, while its contact
+point is constrained relative to the preprocessed contact zero. Configure
+`P50_CP_BOUNDS_UM` in `config.py` (default `(-20.0, 20.0)` µm). This replaces the
+old lower limit tied to the beginning of the high-load subset. These are working
+limits, not a measurement of contact uncertainty. The upper limit is also capped
+just before the first high-load depth so the fitted model has positive indentation.
+
+Boundary solutions emit a warning, show `[cp bound]` in plot legends and save
+`cp_at_bound_p50`, `cp_lower_bound_um_p50`, and `cp_upper_bound_um_p50` in the
+results. Review such solutions rather than interpreting an improved R² alone as
+proof of a valid contact point. The moving method and plotting coordinates are
+unchanged. Rerun the notebook setup/selection and subsequent analysis after
+changing these settings.
+
+## Excel reference workflow
+
+For the original Excel workflow, the repository's `data/` directory can contain
+the inputs below. Filename-mode inputs can stay in their original folders and do
+not need these Excel files.
 
 ```
 data/
@@ -12,7 +142,7 @@ data/
 
 ---
 
-## To run the pipeline on your own data (3 steps)
+## To run the Excel-based command-line pipeline (3 steps)
 
 1. **Drop your raw files** into `data/raw/` (one `.TXT` per sample).
 2. **Copy** `sample_groups_template.xlsx` -> `sample_groups.xlsx` and **fill in one row per file**
@@ -39,20 +169,25 @@ data/
 | `Group`       | yes      | text    | `Group A Native Mono`                 | grouping label — see the pairing rule below |
 
 Any extra columns you add (notes, dates, status, ...) are **kept** and carried through to the
-results — the pipeline only reads the five columns above.
+results. Optional `batch` and `sample_name` fields are also used for source
+styling and specimen labels when supplied.
 
-## Comparing multiple experimental batches
+## Comparing multiple experimental batches using Excel (reference)
+
+For the normal filename workflow, use `FILENAME_SOURCES` above instead. The
+following joint-workbook method remains available for legacy Excel input.
 
 Keep the original raw files and source sheets in place. Create a separate joint
 `sample_groups.xlsx` with one row per measurement and paths relative to a common
 `CIA_RAW_DATA_DIR`. File names may include subdirectories, for example
-`20261022/Native/20261022# 1.TXT`.
+`20261022/Native/Measurement_1_Sample_A_native_mono_1.TXT`.
 
 - Assign globally unique integer `sample_id` values. Duplicate IDs or file names
   are rejected, because fit results are joined using `sample_id`.
 - Keep `original_sample_id`, `original_group`, and `source_sheet` for traceability.
-- Add an optional `batch` column (for example `20261022`). Plots show the batch in
-  legends and use a consistent line style for each batch (four styles cycle).
+- Add an optional `batch` column (for example `20261022`). Plots use a consistent
+  line style per batch (four styles cycle). Legends show specimen codes when
+  available and otherwise fall back to the batch label.
 - Prefix `Group` with the batch so each batch retains its own raw/corrected plot.
 - Keep treatment names unchanged. Treatment comparisons pool batches, while
   additional Native comparisons show batches separately for each test type.

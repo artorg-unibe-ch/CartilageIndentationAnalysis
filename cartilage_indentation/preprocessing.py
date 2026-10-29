@@ -4,9 +4,55 @@ The old "zero at the first row" is unreliable because the first sample is not th
 contact point. Instead the contact point is detected as the first row where the load
 stays above a threshold for a few consecutive rows.
 """
+import os
+import warnings
+
 import numpy as np
+import pandas as pd
 
 from .io_utils import load_raw_txt
+
+MONO_INFO_COLS = ["mono_complete", "mono_incomplete_reason", "drift_correction_applied",
+                  "preprocessing_method"]
+
+
+class MonoPreprocessingError(ValueError):
+    """Keep the curve classification when contact detection subsequently fails."""
+    def __init__(self, message, metadata):
+        super().__init__(message)
+        self.metadata = metadata
+
+
+def mono_curve_metadata(df, post_n=15):
+    """Check the recorded phases required by the two-baseline drift correction.
+
+    Mono phases: 1 loading, 2 hold, 3 unloading, 4 retract. Require at least
+    three unloading points after loading and post_n trailing retract points.
+    A truncated curve remains eligible for loading-only Hertz fitting.
+    """
+    df = df.sort_values("time").reset_index(drop=True)
+    segments = df["segm"].to_numpy()
+    loading = np.flatnonzero(segments == 1)
+    reasons = []
+    if not len(loading):
+        reasons.append("missing_loading")
+    after_loading = segments[loading[-1] + 1:] if len(loading) else segments[:0]
+    if np.count_nonzero(after_loading == 3) < 3:
+        reasons.append("missing_or_truncated_unloading")
+    tail_count = 0
+    for segment in segments[::-1]:
+        if segment != 4:
+            break
+        tail_count += 1
+    unloading = np.flatnonzero(segments == 3)
+    if (tail_count < post_n or not len(unloading) or
+            len(segments) - tail_count <= unloading[-1]):
+        reasons.append("missing_post_retraction_baseline")
+    complete = not reasons
+    return {"mono_complete": complete, "mono_incomplete_reason": "; ".join(reasons),
+            "drift_correction_applied": False,
+            "preprocessing_method": ("drift_correction_and_contact_zeroing" if complete
+                                     else "contact_zeroing_only")}
 
 
 def find_contact_start(df, column="load", threshold=6.0, min_consecutive=3):
@@ -72,9 +118,19 @@ def correct_mono_drift(df, load_col="load", time_col="time", post_n=15,
 
 
 def preprocess_mono(path, threshold=6.0, min_consecutive=3):
-    """Load, correct the baseline drift (mono tests are slow), then detect contact and zero."""
-    df = correct_mono_drift(load_raw_txt(path), threshold=threshold, min_consecutive=min_consecutive)
-    df = zero_from_contact(df, threshold=threshold, min_consecutive=min_consecutive)
+    """Drift-correct complete cycles; only contact-zero incomplete mono curves."""
+    df = load_raw_txt(path)
+    info = mono_curve_metadata(df)
+    try:
+        if not (df["segm"] == 1).any():
+            raise ValueError("No mono loading segment (segm 1)")
+        if info["mono_complete"]:
+            df = correct_mono_drift(df, threshold=threshold, min_consecutive=min_consecutive)
+            info["drift_correction_applied"] = True
+        df = zero_from_contact(df, threshold=threshold, min_consecutive=min_consecutive)
+    except (ValueError, KeyError) as error:
+        raise MonoPreprocessingError(str(error), info) from error
+    df.attrs.update(info)
     if not df.empty:
         df.attrs["max_displ_zeroed"] = float(df["displ_zeroed"].max())
     return df
@@ -95,14 +151,54 @@ def preprocess_sr(path, target_segs, threshold=6.0, min_consecutive=3):
     return df
 
 
-def preprocess_all(index, cfg):
-    """Preprocess every file. Returns ``(mono_data, sr_data)``: path -> processed DataFrame."""
-    mono_data = {
-        f: preprocess_mono(f, cfg.CONTACT_THRESHOLD, cfg.CONTACT_MIN_CONSEC)
-        for g in index.subgroup_mono for f in index.subgrouped_files[g]
-    }
-    sr_data = {
-        f: preprocess_sr(f, cfg.TARGET_SEGS_SR, cfg.CONTACT_THRESHOLD, cfg.CONTACT_MIN_CONSEC)
-        for g in index.subgroup_sr for f in index.subgrouped_files[g]
-    }
+def preprocess_all(index, cfg, *, on_error="raise", return_report=False):
+    """Preprocess curves, with optional per-curve failure reporting.
+
+    Defaults retain strict behavior and return ``(mono_data, sr_data)``.
+    With ``on_error='skip', return_report=True``, failed/empty curves are omitted
+    from those dictionaries and a third DataFrame records every attempted curve.
+    Skipping requires a report so failures cannot silently disappear.
+    """
+    if on_error not in ("raise", "skip"):
+        raise ValueError("on_error must be 'raise' or 'skip'")
+    if on_error == "skip" and not return_report:
+        raise ValueError("Skipping failures requires return_report=True")
+    mono_data, sr_data, rows = {}, {}, []
+    for path in index.files:
+        test_type = index.test_type(path)
+        record = {"sample_id": index.sample_id(path),
+                  "file_name": os.path.relpath(path, index.raw_data_dir),
+                  "treatment": index.treatment(path), "test_type": test_type,
+                  "preprocessing_status": "ok", "preprocessing_error": ""}
+        record.update({column: pd.NA if column in ("mono_complete", "drift_correction_applied")
+                       else "" for column in MONO_INFO_COLS})
+        try:
+            if test_type == "mono":
+                data = preprocess_mono(path, cfg.CONTACT_THRESHOLD, cfg.CONTACT_MIN_CONSEC)
+                target = mono_data
+            elif test_type == "stress_relaxation":
+                data = preprocess_sr(path, cfg.TARGET_SEGS_SR,
+                                     cfg.CONTACT_THRESHOLD, cfg.CONTACT_MIN_CONSEC)
+                target = sr_data
+            else:
+                raise ValueError(f"Unsupported test_type: {test_type}")
+            if data.empty:
+                raise ValueError("No data remaining after preprocessing (check target segments)")
+            record.update({column: data.attrs[column] for column in MONO_INFO_COLS if column in data.attrs})
+            target[path] = data
+        except (ValueError, OSError, KeyError) as error:
+            if on_error == "raise":
+                raise ValueError(f"Preprocessing failed for {record['file_name']}: {error}") from error
+            record.update(preprocessing_status="failed", preprocessing_error=str(error))
+            record.update(getattr(error, "metadata", {}))
+        rows.append(record)
+    report = pd.DataFrame(rows, columns=["sample_id", "file_name", "treatment", "test_type",
+                                         "preprocessing_status", "preprocessing_error"] + MONO_INFO_COLS)
+    index.set_preprocessing_report(report)
+    failed_count = int((report["preprocessing_status"] == "failed").sum())
+    if failed_count:
+        warnings.warn(f"{failed_count} curve(s) failed preprocessing and were skipped. "
+                      "Review the preprocessing report before interpreting results.", RuntimeWarning, stacklevel=2)
+    if return_report:
+        return mono_data, sr_data, report
     return mono_data, sr_data
