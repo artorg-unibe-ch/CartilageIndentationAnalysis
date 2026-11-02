@@ -1,6 +1,8 @@
 """Read the sample-metadata sheet and index the raw files by group / sample."""
 import os
 import re
+import hashlib
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -114,6 +116,30 @@ def metadata_from_filename_sources(sources):
     metadata = pd.concat(frames, ignore_index=True)
     metadata["sample_id"] = range(1, len(metadata) + 1)
     return metadata, common_root
+
+
+def filename_output_tag(sources):
+    """Short, repeatable run folder for a single source or an ordered source set.
+
+    The digest identifies the source configuration, not file contents or fitting
+    settings. Rerunning that configuration intentionally refreshes its outputs.
+    """
+    normalized = []
+    for source in sources:
+        root = Path(source["path"]).expanduser().resolve()
+        normalized.append({"path": str(root), "label": str(source.get("label", root.name)),
+                           "batch": str(source.get("batch", "")),
+                           "recursive": bool(source.get("recursive", False))})
+    if not normalized:
+        raise ValueError("Provide at least one filename source")
+    if len(normalized) == 1:
+        first = normalized[0]
+        prefix = "_".join(filter(None, ("single", first["label"], first["batch"])))
+    else:
+        prefix = "combined_" + "_".join(source["label"] for source in normalized)
+    prefix = re.sub(r"[^a-zA-Z0-9_-]+", "_", prefix)[:48].rstrip("_")
+    digest = hashlib.sha256(json.dumps(normalized, sort_keys=True).encode()).hexdigest()[:8]
+    return f"{prefix}_{digest}"
 
 
 class SampleIndex:

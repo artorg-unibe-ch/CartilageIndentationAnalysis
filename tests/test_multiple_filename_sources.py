@@ -10,10 +10,35 @@ from unittest.mock import patch
 
 import numpy as np
 
-from cartilage_indentation.dataset import SampleIndex
+from cartilage_indentation.dataset import SampleIndex, filename_output_tag
 
 
 class MultipleFilenameSourceTests(unittest.TestCase):
+    def test_output_folders_separate_single_and_combined_runs_under_custom_base(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            first = dict(path=root / 'one', label='M3', batch='20261029', recursive=False)
+            second = dict(path=root / 'two', label='M1', batch='20261022', recursive=True)
+            single = filename_output_tag([first])
+            combined = filename_output_tag([first, second])
+            self.assertTrue(single.startswith('single_M3_20261029_'))
+            self.assertTrue(combined.startswith('combined_M3_M1_'))
+            self.assertNotEqual(single, combined)
+            self.assertEqual(combined, filename_output_tag([dict(first), dict(second)]))
+            self.assertNotEqual(combined, filename_output_tag([second, first]))
+            self.assertNotEqual(single, filename_output_tag([dict(first, recursive=True)]))
+            notebook = json.loads((Path(__file__).resolve().parents[1] / 'notebooks/analysis.ipynb').read_text())
+            setup = ''.join(next(c['source'] for c in notebook['cells'] if c.get('id') == '37b5de61'))
+            calculation = setup.split('# A custom root is a BASE directory;', 1)[1].split('os.environ["CIA_DATA_ROOT"]', 1)[0]
+            calculation = calculation.split('\n', 1)[1]
+            for base, expected_base in [(root / 'custom', root / 'custom'),
+                                        (Path('relative'), root / 'relative'),
+                                        (None, root / 'Analysis_Output')]:
+                for tag in (single, combined):
+                    ns = dict(Path=Path, REPO_ROOT=root, ANALYSIS_OUTPUT_ROOT=base, dataset_tag=tag)
+                    exec(calculation, ns)
+                    self.assertEqual(ns['output_root'], expected_base / tag)
+
     def test_same_basename_has_unique_ids_source_groups_and_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()

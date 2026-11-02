@@ -105,9 +105,14 @@ In multi-source runs, per-group plots distinguish source, specimen, treatment
 and test type. Treatment comparisons pool matching treatment/test-type curves
 across sources. They do not imply biological pairing or statistical significance.
 
-Results default to `Analysis_Output/<folder>/` for one source, or
-`Analysis_Output/combined_filenames_<id>/` for multiple sources. Set
-`ANALYSIS_OUTPUT_ROOT` to override this. Fits are saved to `analysis_results.xlsx`;
+`ANALYSIS_OUTPUT_ROOT` is an output **base directory**, defaulting to
+`Path.home() / "CIA_Output"` to keep paths short across computers. Setup always
+adds a run folder: `single_M3_20261029_<id>` for one source, or
+`combined_M3_M1_M2_<id>` for several sources. The ID identifies the ordered source
+configuration; rerunning it refreshes its folder. Relative bases are resolved
+against the project root; `None` uses `project/Analysis_Output` as the base.
+Exclusion selections get a further `excluded_<id>/` subfolder. Existing output
+folders are not moved. Fits are saved to `analysis_results.xlsx`;
 optional optimization exports also preserve source identity in CSV names.
 
 ### Option B: Excel metadata (original workflow)

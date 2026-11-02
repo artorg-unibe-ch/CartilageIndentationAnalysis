@@ -67,10 +67,20 @@ if sources are reordered or files are added/removed. For exclusions, copy exact
 change the common root and these relative paths; review exclusions after changes.
 
 No input Excel is created or read. Results are saved as `analysis_results.xlsx`
-under `project/Analysis_Output/<folder>` for a single source, or
-`project/Analysis_Output/combined_filenames_<id>` for multiple sources; override
-this with `ANALYSIS_OUTPUT_ROOT`. Different source configurations get separate
-default output directories. Exclusions use their own subfolder as described below.
+under a run folder inside `ANALYSIS_OUTPUT_ROOT`, which is now the output **base**.
+Its default is `Path.home() / "CIA_Output"` (for example `C:\Users\estel\CIA_Output`
+on Windows). A single source gets `single_M3_20261029_<id>/`; a combined run gets
+`combined_M3_M1_M2_<id>/`. The ID identifies the ordered source configuration;
+source paths, labels, batches and recursion settings contribute to it. Rerunning
+the same configuration updates its folder; this is not a timestamped archive.
+Fits with different parameters but the same sources also update that folder.
+Use a different output base if both parameter versions must be kept.
+
+Custom bases also get the automatic run subfolder. Relative bases are resolved
+against the project root; `None` uses `project/Analysis_Output` as the base.
+Old outputs are not moved. Setup prints the active path. Keep the base short on
+Windows because plot subdirectories and filenames add to its length.
+Exclusions use their own subfolder as described below.
 Both optional optimization exporters also accept the parsed metadata, preserve
 specimen identity in CSV names and honor exclusions. Multi-source exports prefix
 each CSV name with its source label to avoid collisions. Their manifests preserve
