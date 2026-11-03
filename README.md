@@ -114,6 +114,9 @@ against the project root; `None` uses `project/Analysis_Output` as the base.
 Exclusion selections get a further `excluded_<id>/` subfolder. Existing output
 folders are not moved. Fits are saved to `analysis_results.xlsx`;
 optional optimization exports also preserve source identity in CSV names.
+These exports are in notebook Sections 8–9 and default to disabled. Enable
+`RUN_OPTIMIZATION_EXPORT_90DEG` or `RUN_OPTIMIZATION_EXPORT_45DEG` in the relevant
+code cell only when that sector's files are needed; the switches are independent.
 
 ### Option B: Excel metadata (original workflow)
 
@@ -156,7 +159,9 @@ metadata sheet.
 Or, for an **interactive run**, open `notebooks/analysis.ipynb` — it imports the same
 package and runs each step in cells, showing the fitted parameters and figures inline.
 Choose the filename or Excel option first, review the metadata preview, then run
-the exclusion block and Steps 2–6. After changing sources, restart the kernel and
+the exclusion block and Steps 2–7. Sections 3–6 cover raw/corrected plots, joint
+treatment plots, mono fits and stress-relaxation fits, respectively.
+After changing sources, restart the kernel and
 rerun in order. The default filename sources now include M1/20261022 Sample A,
 M2/20261026 Sample A, and M3/20261029 specimens. The M2 source selects the canonical
 `raw/` folder rather than its duplicate exports.

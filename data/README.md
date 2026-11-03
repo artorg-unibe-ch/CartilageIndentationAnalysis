@@ -86,6 +86,11 @@ specimen identity in CSV names and honor exclusions. Multi-source exports prefix
 each CSV name with its source label to avoid collisions. Their manifests preserve
 source paths and labels. Filename-mode exports go
 under the analysis output in `optimization_90deg/` or `optimization_45deg/`.
+Notebook Section 8 uses `RUN_OPTIMIZATION_EXPORT_90DEG = False` by default;
+Section 9 uses `RUN_OPTIMIZATION_EXPORT_45DEG = False`. Change only the required
+switch to `True` to generate that export. Disabled modules skip all export work
+and do not create CSVs, summaries, manifests or previews. Existing exports are
+not deleted when the switches are off.
 
 Set `INPUT_MODE = "excel"` to use the original workbook input. Its path examples
 and instructions remain in the notebook as a reference. The command-line

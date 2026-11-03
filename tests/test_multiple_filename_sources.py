@@ -1,6 +1,5 @@
 import tempfile
 import unittest
-import ast
 import contextlib
 import io
 import json
@@ -113,20 +112,40 @@ class MultipleFilenameSourceTests(unittest.TestCase):
                 sources.append(dict(path=folder, label=label))
             index = SampleIndex.from_filename_sources(sources)
             for code in exporters:
-                tree = ast.parse(code)
-                # Execute definitions without the final automatic export call.
-                tree.body = tree.body[:-2]
+                angle = '90' if 'RUN_OPTIMIZATION_EXPORT_90DEG' in code else '45'
+                enabled = code.replace(f'RUN_OPTIMIZATION_EXPORT_{angle}DEG = False',
+                                       f'RUN_OPTIMIZATION_EXPORT_{angle}DEG = True', 1)
                 ns = dict(INPUT_MODE='filenames', full_index=index, index=index,
-                          cfg=SimpleNamespace(OUTPUT_ROOT=str(root / 'output')), excluded_raw_paths=set())
+                          cfg=SimpleNamespace(OUTPUT_ROOT=str(root / 'output')), excluded_raw_paths=set(),
+                          display=lambda *_: None)
                 with patch('pandas.read_excel', side_effect=AssertionError('No Excel input')), patch(
                         'matplotlib.figure.Figure.savefig'), contextlib.redirect_stdout(io.StringIO()):
-                    exec(compile(tree, '<notebook-exporter>', 'exec'), ns)
-                    manifest = ns['export_optimization_data']()
+                    exec(compile(enabled, '<notebook-exporter>', 'exec'), ns)
+                    manifest = ns[f'optimization_manifest_{angle}deg']
+                    other = next(other for other in exporters if other != code)
+                    exec(other, ns)  # the other module stays disabled
+                    self.assertIs(ns[f'optimization_manifest_{angle}deg'], manifest)
                 self.assertEqual(len(manifest), 2)
                 self.assertEqual(manifest.csv_file.nunique(), 2)
                 self.assertEqual(set(manifest.source_label), {'first', 'second'})
                 self.assertTrue(all((ns['EXPORT_ROOT'] / file).is_file() for file in manifest.csv_file))
                 self.assertTrue(manifest.csv_file.str.contains('__Measurement_1_Sample_A').all())
+
+    def test_export_switches_default_off_and_do_not_touch_files_or_require_inputs(self):
+        notebook = json.loads((Path(__file__).resolve().parents[1] / 'notebooks/analysis.ipynb').read_text())
+        exporters = [''.join(c['source']) for c in notebook['cells']
+                     if c['cell_type'] == 'code' and 'def export_optimization_data' in ''.join(c['source'])]
+        ns = {'INPUT_MODE': 'filenames'}  # no loaded index or dataset is required when disabled
+        with patch('pathlib.Path.mkdir', side_effect=AssertionError('Must not create folders')), patch(
+                'pandas.read_excel', side_effect=AssertionError('Must not read Excel')), patch(
+                'pandas.DataFrame.to_csv', side_effect=AssertionError('Must not write CSVs')), patch(
+                'matplotlib.figure.Figure.savefig', side_effect=AssertionError('Must not create images')), contextlib.redirect_stdout(io.StringIO()):
+            for code in exporters:
+                exec(code, ns)
+        self.assertFalse(ns['RUN_OPTIMIZATION_EXPORT_90DEG'])
+        self.assertFalse(ns['RUN_OPTIMIZATION_EXPORT_45DEG'])
+        self.assertIsNone(ns['optimization_manifest_90deg'])
+        self.assertIsNone(ns['optimization_manifest_45deg'])
 
 
 if __name__ == '__main__':
